@@ -205,6 +205,7 @@ func (m *Model) renderModelPicker() string {
 			if m.cfg.Router.Provider == provName && m.cfg.Router.Model == model.ID {
 				marker = successStyle.Render("→ ")
 				current = dimStyle.Render(" (current)")
+			}
 			label := model.Label
 			reasoner := ""
 			if model.Reasoner {
