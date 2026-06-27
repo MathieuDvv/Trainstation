@@ -160,6 +160,35 @@ func (e *Executor) runTask(ctx context.Context, task *Task) {
 	var output strings.Builder
 	for chunk := range ch {
 		if chunk.Error != nil && chunk.IsFinal {
+			outStr := strings.ToLower(output.String())
+			isUsageError := strings.Contains(outStr, "usage") || strings.Contains(outStr, "limit") || strings.Contains(outStr, "subscription") || strings.Contains(outStr, "quota") || strings.Contains(outStr, "credit") || strings.Contains(outStr, "billing")
+
+			if isUsageError {
+				var fallback string
+				for _, name := range e.registry.Available() {
+					if name != task.Agent && !strings.Contains(output.String(), name+" failed") { // simple hack to avoid infinite loop
+						fallback = name
+						break
+					}
+				}
+
+				if fallback != "" {
+					msg := fmt.Sprintf("\n\n[Scheduler] Usage limit reached for %s. Reassigning task to %s...\n", task.Agent, fallback)
+					e.events <- Event{
+						Type:   EventTaskOutput,
+						TaskID: task.ID,
+						Agent:  task.Agent,
+						Text:   msg,
+					}
+					
+					// Modify task and retry synchronously
+					task.Agent = fallback
+					task.Description += "\n\n(Note: previous agent failed due to usage limits, please complete this task)"
+					e.runTask(ctx, task)
+					return
+				}
+			}
+
 			e.events <- Event{
 				Type:   EventTaskError,
 				TaskID: task.ID,

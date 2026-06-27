@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -97,6 +98,7 @@ type Model struct {
 	activeTasks    map[int]bool
 	completedTasks map[int]bool
 	cancelFn       context.CancelFunc
+	updateAvailable bool
 
 	popup           popupModel
 	showSidebar     bool
@@ -157,8 +159,36 @@ func New(cfg *config.Config, rtr *router.Router, reg *agent.Registry) Model {
 	return m
 }
 
+func (m Model) checkGitUpdate() tea.Cmd {
+	return func() tea.Msg {
+		localCmd := exec.Command("git", "rev-parse", "HEAD")
+		localOut, err := localCmd.Output()
+		if err != nil {
+			return gitUpdateMsg{false}
+		}
+
+		remoteCmd := exec.Command("git", "ls-remote", "origin", "main")
+		remoteOut, err := remoteCmd.Output()
+		if err != nil {
+			return gitUpdateMsg{false}
+		}
+
+		localSha := strings.TrimSpace(string(localOut))
+		parts := strings.Fields(string(remoteOut))
+		if len(parts) > 0 {
+			remoteSha := parts[0]
+			return gitUpdateMsg{Available: localSha != remoteSha && remoteSha != ""}
+		}
+		return gitUpdateMsg{false}
+	}
+}
+
+type gitUpdateMsg struct {
+	Available bool
+}
+
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.fetchUsage(), m.tick(), m.prefetchModels())
+	return tea.Batch(textarea.Blink, m.fetchUsage(), m.tick(), m.prefetchModels(), m.checkGitUpdate())
 }
 
 type routeResultMsg struct {
@@ -184,6 +214,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case gitUpdateMsg:
+		m.updateAvailable = msg.Available
+		if m.updateAvailable {
+			m.addInfoEntry(lipgloss.NewStyle().Foreground(t.success).Bold(true).Render("🎉 A new version of Trainstation is available on GitHub!\nType `git pull && go build` or use the system terminal to update."))
+			m.refreshViewport()
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
