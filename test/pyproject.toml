@@ -35,6 +35,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages]
 find = {where = ["src"]}
 
+[tool.setuptools.package-data]
+"cli_tool.db" = ["*.sql"]
+
 [tool.ruff]
 target-version = "py310"
 

@@ -47,7 +47,7 @@ type entry struct {
 	agent     string
 	taskID    int
 	taskDesc  string
-	text      strings.Builder
+	text      string
 	done      bool
 	err       error
 	startTime time.Time
@@ -895,7 +895,7 @@ func (m *Model) resize() {
 
 func (m *Model) addUserEntry(text string) {
 	e := entry{kind: entryUser, agent: "user", startTime: time.Now()}
-	e.text.WriteString(text)
+	e.text = text
 	m.entries = append(m.entries, e)
 	m.refreshViewport()
 	m.viewport.GotoBottom()
@@ -917,7 +917,7 @@ func (m *Model) addRouterEntry(reasoning string, tasks []router.TaskSpec) {
 		sb.WriteString(fmt.Sprintf("  #%d %s%s\n    %s\n", task.ID, name, deps, task.Description))
 	}
 	e := entry{kind: entryRouter, agent: "router", startTime: time.Now()}
-	e.text.WriteString(sb.String())
+	e.text = sb.String()
 	m.entries = append(m.entries, e)
 	m.refreshViewport()
 }
@@ -937,7 +937,7 @@ func (m *Model) addAgentEntry(taskID int, agentName, desc string) {
 func (m *Model) appendAgentOutput(taskID int, text string) {
 	for i := len(m.entries) - 1; i >= 0; i-- {
 		if m.entries[i].kind == entryAgent && m.entries[i].taskID == taskID {
-			m.entries[i].text.WriteString(text)
+			m.entries[i].text += text
 			return
 		}
 	}
@@ -955,14 +955,14 @@ func (m *Model) markAgentEntryDone(taskID int, err error) {
 
 func (m *Model) addErrorEntry(text string) {
 	e := entry{kind: entryError, agent: "error", startTime: time.Now()}
-	e.text.WriteString(text)
+	e.text = text
 	m.entries = append(m.entries, e)
 	m.refreshViewport()
 }
 
 func (m *Model) addInfoEntry(text string) {
 	e := entry{kind: entryInfo, agent: "system", startTime: time.Now()}
-	e.text.WriteString(text)
+	e.text = text
 	m.entries = append(m.entries, e)
 	m.refreshViewport()
 }
@@ -1012,7 +1012,7 @@ func (m Model) renderEntries() string {
 			bar := leftBar(color)
 			label := boldStyle.Foreground(color).Render("You")
 			
-			wrapped := wordwrap.String(e.text.String(), wrapWidth)
+			wrapped := wordwrap.String(e.text, wrapWidth)
 			var bodyStr string
 			for i, line := range strings.Split(wrapped, "\n") {
 				if i > 0 { bodyStr += "\n" }
@@ -1025,7 +1025,7 @@ func (m Model) renderEntries() string {
 			bar := leftBar(color)
 			label := boldStyle.Foreground(color).Render("Router")
 			
-			wrapped := wordwrap.String(e.text.String(), wrapWidth)
+			wrapped := wordwrap.String(e.text, wrapWidth)
 			var bodyStr string
 			for i, line := range strings.Split(wrapped, "\n") {
 				if i > 0 { bodyStr += "\n" }
@@ -1051,7 +1051,7 @@ func (m Model) renderEntries() string {
 			if e.taskDesc != "" {
 				desc = mutedStyle.Render(e.taskDesc) + "\n"
 			}
-			output := strings.TrimRight(e.text.String(), "\n")
+			output := strings.TrimRight(e.text, "\n")
 			headerLine := bar + label + " " + meta
 			descLine := ""
 			if desc != "" {
@@ -1070,7 +1070,7 @@ func (m Model) renderEntries() string {
 
 		case entryError:
 			bar := leftBar(t.error)
-			wrapped := wordwrap.String("✗ " + e.text.String(), wrapWidth)
+			wrapped := wordwrap.String("✗ " + e.text, wrapWidth)
 			var bodyStr string
 			for i, line := range strings.Split(wrapped, "\n") {
 				if i > 0 { bodyStr += "\n" }
@@ -1080,7 +1080,7 @@ func (m Model) renderEntries() string {
 
 		case entryInfo:
 			bar := leftBar(t.textDim)
-			wrapped := wordwrap.String(e.text.String(), wrapWidth)
+			wrapped := wordwrap.String(e.text, wrapWidth)
 			var bodyStr string
 			for i, line := range strings.Split(wrapped, "\n") {
 				if i > 0 { bodyStr += "\n" }

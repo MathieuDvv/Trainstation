@@ -111,7 +111,7 @@ func (m *Model) handleSlashCommand(input string) (handled bool, err error) {
 	case "copy":
 		var sb strings.Builder
 		for _, e := range m.entries {
-			sb.WriteString(e.text.String())
+			sb.WriteString(e.text)
 			sb.WriteString("\n")
 		}
 		err := clipboard.WriteAll(sb.String())
