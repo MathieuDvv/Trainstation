@@ -42,7 +42,7 @@ var t = theme{
 	borderActive: lipgloss.Color("#555555"),
 	text:         lipgloss.Color("#EEEEEE"),
 	textMuted:    lipgloss.Color("#888888"),
-	textDim:      lipgloss.Color("#555555"),
+	textDim:      lipgloss.Color("#777777"),
 	primary:      lipgloss.Color("#00E5FF"), // Neon cyan
 	secondary:    lipgloss.Color("#B026FF"), // Neon purple
 	accent:       lipgloss.Color("#00E5FF"),
