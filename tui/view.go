@@ -162,19 +162,25 @@ func (m Model) renderMetaRight(width int) string {
 }
 
 func (m Model) renderStatusLeft() string {
+	var status string
 	switch m.state {
 	case stateIdle:
-		return mutedStyle.Render("● Ready")
+		status = mutedStyle.Render("● Ready")
 	case stateRouting:
-		return warningStyle.Render(m.spinner.View() + " Analyzing task...")
+		status = warningStyle.Render(m.spinner.View() + " Analyzing task...")
 	case stateExecuting:
 		active := len(m.activeTasks)
-		return lipgloss.NewStyle().Foreground(t.info).Render(fmt.Sprintf("● Executing %d task(s)", active))
+		status = lipgloss.NewStyle().Foreground(t.info).Render(fmt.Sprintf("● Executing %d task(s)", active))
 	case stateDone:
-		return successStyle.Render("● Completed — type a new task")
+		status = successStyle.Render("● Completed — type a new task")
 	default:
-		return ""
+		status = ""
 	}
+
+	if m.focusAgent != "" || m.focusTaskID >= 0 {
+		status += "  " + lipgloss.NewStyle().Foreground(t.warning).Bold(true).Render("[ESC to return to main view]")
+	}
+	return status
 }
 
 func (m Model) renderSidebar() string {
@@ -211,11 +217,13 @@ func (m Model) renderSidebar() string {
 	}
 
 	// Agents section
-	agentsHdr := " AGENTS"
-	if m.sidebarMode == "agents" {
-		agentsHdr = "▶ AGENTS"
+	agentsHdr := boldStyle.Foreground(t.textMuted).Render(" AGENTS")
+	if m.sidebarFocus && m.sidebarMode == "agents" {
+		agentsHdr = lipgloss.NewStyle().Foreground(t.text).Bold(true).Render("▶ AGENTS")
+	} else if m.sidebarMode == "agents" {
+		agentsHdr = boldStyle.Foreground(t.textMuted).Render("▶ AGENTS")
 	}
-	sb.WriteString("\n" + boldStyle.Foreground(t.textMuted).Render(agentsHdr) + "\n\n")
+	sb.WriteString("\n" + agentsHdr + "\n\n")
 
 	agentOrder := []string{"claude", "codex", "opencode", "antigravity"}
 	idx := 0
@@ -232,11 +240,13 @@ func (m Model) renderSidebar() string {
 	sb.WriteString("\n" + boldStyle.Foreground(t.textMuted).Render(" PROGRESS") + "\n\n")
 	sb.WriteString(m.renderProgress(w))
 
-	tasksHdr := " TASKS"
-	if m.sidebarMode == "tasks" {
-		tasksHdr = "▶ TASKS"
+	tasksHdr := boldStyle.Foreground(t.textMuted).Render(" TASKS")
+	if m.sidebarFocus && m.sidebarMode == "tasks" {
+		tasksHdr = lipgloss.NewStyle().Foreground(t.text).Bold(true).Render("▶ TASKS")
+	} else if m.sidebarMode == "tasks" {
+		tasksHdr = boldStyle.Foreground(t.textMuted).Render("▶ TASKS")
 	}
-	sb.WriteString("\n\n" + boldStyle.Foreground(t.textMuted).Render(tasksHdr) + "\n\n")
+	sb.WriteString("\n\n" + tasksHdr + "\n\n")
 	sb.WriteString(m.renderTaskList(w))
 
 	content := sb.String()
@@ -273,7 +283,8 @@ func (m Model) renderAgentUsageLine(name string, selected bool) string {
 	bg := t.bgPanel
 	if selected {
 		bg = t.bgElement
-		nameLine := lipgloss.NewStyle().Background(bg).Foreground(dotColor).Render(dot) + " " +
+		nameLine := lipgloss.NewStyle().Background(bg).Foreground(t.text).Bold(true).Render("▶ ") +
+			lipgloss.NewStyle().Background(bg).Foreground(dotColor).Render(dot) + " " +
 			lipgloss.NewStyle().Background(bg).Foreground(color).Bold(true).Render(label)
 		
 		var renderedUsage string
@@ -380,8 +391,8 @@ func (m Model) renderTaskList(width int) string {
 			agentTag = lipgloss.NewStyle().Background(bg).Foreground(color).Render(agentLabel(task.Agent))
 			statusStyle = lipgloss.NewStyle().Background(bg).Foreground(statusStyle.GetForeground())
 			desc = lipgloss.NewStyle().Background(bg).Foreground(t.textDim).Render(desc)
-			sb.WriteString(lipgloss.NewStyle().Background(bg).Width(width-4).Padding(0, 1).Render(fmt.Sprintf("%s #%d %s\n  %s",
-				statusStyle.Render(status), task.ID, agentTag, desc)) + "\n")
+			sb.WriteString(lipgloss.NewStyle().Background(bg).Width(width-4).Padding(0, 1).Render(fmt.Sprintf("%s %s #%d %s\n  %s",
+				lipgloss.NewStyle().Foreground(t.text).Bold(true).Render("▶"), statusStyle.Render(status), task.ID, agentTag, desc)) + "\n")
 			continue
 		}
 

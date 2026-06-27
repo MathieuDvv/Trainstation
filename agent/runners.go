@@ -67,7 +67,7 @@ func NewCodexRunner(skip bool, extra []string) *CodexRunner {
 func (c *CodexRunner) Run(ctx context.Context, workspace string, prompt string) (<-chan OutputChunk, error) {
 	args := []string{"exec"}
 	if c.SkipPermissions {
-		args = append(args, "--full-auto")
+		args = append(args, "--dangerously-bypass-approvals-and-sandbox")
 	}
 	args = append(args, c.ExtraArgs...)
 	args = append(args, prompt)
