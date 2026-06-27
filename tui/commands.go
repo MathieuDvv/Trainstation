@@ -219,7 +219,7 @@ func (m *Model) renderModelPicker() string {
 			}
 			
 			if m.popup.selected == idx {
-				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("#000000")).Bold(true).Render(line) + "\n")
+				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bgPanel).Bold(true).Render(line) + "\n")
 			} else {
 				sb.WriteString(line + "\n")
 			}
