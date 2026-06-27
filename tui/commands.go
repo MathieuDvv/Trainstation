@@ -205,19 +205,24 @@ func (m *Model) renderModelPicker() string {
 			if m.cfg.Router.Provider == provName && m.cfg.Router.Model == model.ID {
 				marker = successStyle.Render("→ ")
 				current = dimStyle.Render(" (current)")
-			}
-			
 			label := model.Label
-			if m.popup.selected == idx {
-				label = lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Padding(0, 1).Render(label)
-			}
-			idx++
-
 			reasoner := ""
 			if model.Reasoner {
 				reasoner = warningStyle.Render(" ◆")
 			}
-			sb.WriteString(fmt.Sprintf("%s%s%s%s\n", marker, label, reasoner, current))
+			
+			line := fmt.Sprintf("%s%s%s%s", marker, label, reasoner, current)
+			pad := 46 - lipgloss.Width(line)
+			if pad > 0 {
+				line += strings.Repeat(" ", pad)
+			}
+			
+			if m.popup.selected == idx {
+				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Render(line) + "\n")
+			} else {
+				sb.WriteString(line + "\n")
+			}
+			idx++
 		}
 		sb.WriteString("\n")
 	}
@@ -393,13 +398,24 @@ func (m *Model) renderUsagePopup() string {
 			color := agentColor(name)
 			label := agentLabel(name)
 			status := u.StatusLine()
+			barW := 15
+			var filled int
+			var barColor lipgloss.Color
 			if u.HasPercent {
-				barW := 15
-				filled := int(u.Percent * float64(barW))
-				bar := lipgloss.NewStyle().Foreground(t.success).Render(strings.Repeat("█", filled)) +
-					lipgloss.NewStyle().Foreground(t.textDim).Render(strings.Repeat("░", barW-filled))
-				status += "  " + bar
+				filled = int(u.Percent * float64(barW))
+				barColor = t.success
+				if u.Percent < 0.2 { barColor = t.error }
+			} else if u.Error == "" && u.LoggedIn {
+				filled = barW
+				barColor = t.info
+			} else {
+				filled = 0
+				barColor = t.textDim
 			}
+			bar := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled)) +
+				lipgloss.NewStyle().Foreground(t.textDim).Render(strings.Repeat("░", barW-filled))
+			status += "  " + bar
+			
 			sb.WriteString(lipgloss.NewStyle().Foreground(color).Render(label) + "  " + mutedStyle.Render(status) + "\n")
 		}
 	}

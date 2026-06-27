@@ -291,13 +291,24 @@ func (m Model) renderAgentUsageLine(name string, selected bool) string {
 		if m.usageSnapshot != nil {
 			if u, ok := m.usageSnapshot.Agents[name]; ok {
 				usageStr := u.StatusLine()
+				barW := 10
+				var filled int
+				var barColor lipgloss.Color
 				if u.HasPercent {
-					barW := 10
-					filled := int(u.Percent * float64(barW))
-					bar := lipgloss.NewStyle().Foreground(t.success).Background(bg).Render(strings.Repeat("█", filled)) +
-						lipgloss.NewStyle().Foreground(t.textDim).Background(bg).Render(strings.Repeat("░", barW-filled))
-					usageStr += "  " + bar
+					filled = int(u.Percent * float64(barW))
+					barColor = t.success
+					if u.Percent < 0.2 { barColor = t.error }
+				} else if u.Error == "" && u.LoggedIn {
+					filled = barW
+					barColor = t.info
+				} else {
+					filled = 0
+					barColor = t.textDim
 				}
+				bar := lipgloss.NewStyle().Foreground(barColor).Background(bg).Render(strings.Repeat("█", filled)) +
+					lipgloss.NewStyle().Foreground(t.textDim).Background(bg).Render(strings.Repeat("░", barW-filled))
+				usageStr += "  " + bar
+
 				if u.Error != "" {
 					renderedUsage = lipgloss.NewStyle().Background(bg).Foreground(t.textDim).Render(usageStr)
 				} else {
@@ -325,13 +336,24 @@ func (m Model) renderAgentUsageLine(name string, selected bool) string {
 	if m.usageSnapshot != nil {
 		if u, ok := m.usageSnapshot.Agents[name]; ok {
 			usageStr := u.StatusLine()
+			barW := 10
+			var filled int
+			var barColor lipgloss.Color
 			if u.HasPercent {
-				barW := 10
-				filled := int(u.Percent * float64(barW))
-				bar := lipgloss.NewStyle().Foreground(t.success).Render(strings.Repeat("█", filled)) +
-					lipgloss.NewStyle().Foreground(t.textDim).Render(strings.Repeat("░", barW-filled))
-				usageStr += "  " + bar
+				filled = int(u.Percent * float64(barW))
+				barColor = t.success
+				if u.Percent < 0.2 { barColor = t.error }
+			} else if u.Error == "" && u.LoggedIn {
+				filled = barW
+				barColor = t.info
+			} else {
+				filled = 0
+				barColor = t.textDim
 			}
+			bar := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled)) +
+				lipgloss.NewStyle().Foreground(t.textDim).Render(strings.Repeat("░", barW-filled))
+			usageStr += "  " + bar
+
 			if u.Error != "" {
 				renderedUsage = lipgloss.NewStyle().Foreground(t.textDim).Render(usageStr)
 			} else {
@@ -599,16 +621,19 @@ func (m Model) renderThinkingPicker() string {
 		}
 		
 		label := boldStyle.Render(lv.id)
-		if m.popup.selected == i {
-			label = lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Padding(0, 1).Render(lv.id)
+		
+		line := fmt.Sprintf("%s%s%s", marker, label, current)
+		pad := 40 - lipgloss.Width(line)
+		if pad > 0 {
+			line += strings.Repeat(" ", pad)
 		}
 		
-		sb.WriteString(fmt.Sprintf("%s%s%s\n%s\n\n",
-			marker,
-			label,
-			current,
-			dimStyle.Render(lv.desc),
-		))
+		if m.popup.selected == i {
+			sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Render(line) + "\n")
+		} else {
+			sb.WriteString(line + "\n")
+		}
+		sb.WriteString(dimStyle.Render(lv.desc) + "\n\n")
 	}
 	sb.WriteString(dimStyle.Render("Press Enter to select or type level"))
 	return sb.String()
