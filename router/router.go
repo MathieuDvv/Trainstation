@@ -172,6 +172,20 @@ func (r *Router) ProviderName() string  { return r.provider }
 func (r *Router) Thinking() string      { return r.thinking }
 func (r *Router) SetThinking(level string) { r.thinking = level }
 
+func (r *Router) UpdateConfig(providerName, modelID, apiKey, baseURL string) {
+	r.provider = providerName
+	r.model = modelID
+	clientOpts := []option.RequestOption{
+		option.WithAPIKey(apiKey),
+		option.WithHTTPClient(safeHTTPClient),
+	}
+	if baseURL != "" {
+		clientOpts = append(clientOpts, option.WithBaseURL(baseURL))
+	}
+	client := openai.NewClient(clientOpts...)
+	r.client = &client
+}
+
 func (r *Router) UpdateAvailable(available []string) {
 	if len(available) > 0 {
 		r.available = available

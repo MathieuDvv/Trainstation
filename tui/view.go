@@ -419,19 +419,19 @@ func (m Model) renderPopup(background string) string {
 		title = "Select Router Model"
 		content = m.renderModelPicker()
 		popupWidth = 60
-		popupHeight = 20
+		popupHeight = 24
 
 	case popupProviderManager:
 		title = "Manage Providers"
 		content = m.renderProviderManager()
-		popupWidth = 60
-		popupHeight = 22
+		popupWidth = 62
+		popupHeight = 24
 
 	case popupThinkingPicker:
 		title = "Thinking Level"
 		content = m.renderThinkingPicker()
 		popupWidth = 44
-		popupHeight = 12
+		popupHeight = 20
 
 	case popupAgents:
 		title = "Agents"
@@ -465,7 +465,10 @@ func (m Model) renderPopup(background string) string {
 		Padding(0, 1).
 		Render(" " + title + " ")
 
-	hasInput := m.popup.kind == popupModelPicker || m.popup.kind == popupProviderManager || m.popup.kind == popupThinkingPicker
+	hasInput := m.popup.kind == popupModelPicker || m.popup.kind == popupThinkingPicker
+	if m.popup.kind == popupProviderManager && m.popup.addingProvider != "" {
+		hasInput = true
+	}
 	inputLine := ""
 	if hasInput {
 		inputLine = "\n" + lipgloss.NewStyle().Foreground(t.info).Background(t.bgElement).Render("> ") +

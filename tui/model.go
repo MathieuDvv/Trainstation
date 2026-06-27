@@ -71,6 +71,10 @@ type popupModel struct {
 	selected int
 	input    string
 	options  []string
+
+	provSection    int    // 0=configured, 1=available
+	provSelected   int    // selected index within current section
+	addingProvider string // non-empty = in API key input mode
 }
 
 type Model struct {
@@ -231,6 +235,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		if msg.Action == tea.MouseActionRelease && msg.Button == tea.MouseButtonLeft {
+			if m.popup.kind != popupNone {
+				return m.handlePopupClick(msg)
+			}
 			mainWidth := m.width
 			if m.showSidebar {
 				mainWidth = m.width - sidebarWidth
@@ -529,12 +536,84 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handlePopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc, tea.KeyCtrlC:
+		if m.popup.kind == popupProviderManager && m.popup.addingProvider != "" {
+			m.popup.addingProvider = ""
+			m.popup.input = ""
+			return m, nil
+		}
 		m.popup = popupModel{kind: popupNone}
 		m.input.Focus()
 		return m, nil
 
+	case tea.KeyTab:
+		if m.popup.kind == popupProviderManager && m.popup.addingProvider == "" {
+			m.popup.provSection = 1 - m.popup.provSection
+			m.popup.provSelected = 0
+			return m, nil
+		}
+
+	case tea.KeyUp:
+		if m.popup.kind == popupProviderManager && m.popup.addingProvider == "" {
+			n := m.provSectionItems()
+			if m.popup.provSelected > 0 {
+				m.popup.provSelected--
+			} else if n > 0 {
+				m.popup.provSelected = n - 1
+			}
+			return m, nil
+		}
+		if len(m.popup.options) > 0 {
+			if m.popup.selected > 0 {
+				m.popup.selected--
+			}
+			return m, nil
+		}
+
+	case tea.KeyDown:
+		if m.popup.kind == popupProviderManager && m.popup.addingProvider == "" {
+			n := m.provSectionItems()
+			if m.popup.provSelected < n-1 {
+				m.popup.provSelected++
+			} else if n > 0 {
+				m.popup.provSelected = 0
+			}
+			return m, nil
+		}
+		if len(m.popup.options) > 0 {
+			if m.popup.selected < len(m.popup.options)-1 {
+				m.popup.selected++
+			}
+			return m, nil
+		}
+
 	case tea.KeyEnter:
-		if m.popup.kind == popupModelPicker || m.popup.kind == popupProviderManager || m.popup.kind == popupThinkingPicker {
+		if m.popup.kind == popupProviderManager {
+			if m.popup.addingProvider != "" {
+				key := strings.TrimSpace(m.popup.input)
+				if key == "" {
+					def := provider.Get(m.popup.addingProvider)
+					if def != nil {
+						if envVal := os.Getenv(def.EnvVar); envVal != "" {
+							key = envVal
+						}
+					}
+				}
+				if key != "" {
+					m.cfg.SetProvider(m.popup.addingProvider, key)
+					config.Save(m.cfg)
+					m.addInfoEntry("Provider added: " + m.popup.addingProvider)
+					provider.InvalidateCache(m.popup.addingProvider)
+				}
+				m.popup.addingProvider = ""
+				m.popup.input = ""
+				return m, nil
+			}
+			if m.popup.provSection == 0 {
+				return m.removeSelectedProvider()
+			}
+			return m.addSelectedProvider()
+		}
+		if m.popup.kind == popupModelPicker || m.popup.kind == popupThinkingPicker {
 			input := strings.TrimSpace(m.popup.input)
 			if input == "" && len(m.popup.options) > 0 && m.popup.selected >= 0 && m.popup.selected < len(m.popup.options) {
 				input = m.popup.options[m.popup.selected]
@@ -549,35 +628,35 @@ func (m Model) handlePopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.popup = popupModel{kind: popupNone}
 		m.input.Focus()
 		return m, nil
-		
-	case tea.KeyUp:
-		if len(m.popup.options) > 0 {
-			if m.popup.selected > 0 {
-				m.popup.selected--
-			}
-			return m, nil
-		}
 
-	case tea.KeyDown:
-		if len(m.popup.options) > 0 {
-			if m.popup.selected < len(m.popup.options)-1 {
-				m.popup.selected++
-			}
-			return m, nil
-		}
-	}
-
-	if m.popup.kind == popupModelPicker || m.popup.kind == popupProviderManager || m.popup.kind == popupThinkingPicker {
-		if msg.Type == tea.KeyBackspace {
+	case tea.KeyBackspace:
+		if m.popup.kind == popupProviderManager && m.popup.addingProvider != "" {
 			if len(m.popup.input) > 0 {
 				m.popup.input = m.popup.input[:len(m.popup.input)-1]
 			}
 			return m, nil
 		}
+		if m.popup.kind == popupModelPicker || m.popup.kind == popupThinkingPicker {
+			if len(m.popup.input) > 0 {
+				m.popup.input = m.popup.input[:len(m.popup.input)-1]
+			}
+			return m, nil
+		}
+	}
+
+	if m.popup.kind == popupProviderManager && m.popup.addingProvider != "" {
 		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
 			m.popup.input += string(msg.Runes)
 			return m, nil
 		}
+		return m, nil
+	}
+	if m.popup.kind == popupModelPicker || m.popup.kind == popupThinkingPicker {
+		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
+			m.popup.input += string(msg.Runes)
+			return m, nil
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -1019,4 +1098,211 @@ func (m Model) activeAgents() []string {
 
 func getEnv(key string) string {
 	return os.Getenv(key)
+}
+
+func (m *Model) handlePopupClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	popupW, popupH := m.popupDim()
+	popupX := (m.width - popupW) / 2
+	popupY := (m.height - popupH) / 2
+
+	if msg.X < popupX || msg.X >= popupX+popupW || msg.Y < popupY || msg.Y >= popupY+popupH {
+		m.popup = popupModel{kind: popupNone}
+		m.input.Focus()
+		return m, nil
+	}
+
+	bodyY := msg.Y - popupY - 3
+	if bodyY < 0 {
+		return m, nil
+	}
+
+	switch m.popup.kind {
+	case popupModelPicker:
+		return m.clickModelPicker(bodyY)
+	case popupThinkingPicker:
+		return m.clickThinkingPicker(bodyY)
+	case popupProviderManager:
+		return m.clickProviderManager(bodyY)
+	}
+
+	return m, nil
+}
+
+func (m *Model) popupDim() (int, int) {
+	switch m.popup.kind {
+	case popupHelp:
+		return 58, 14
+	case popupModelPicker:
+		return 60, 24
+	case popupProviderManager:
+		return 62, 24
+	case popupThinkingPicker:
+		return 44, 20
+	case popupAgents:
+		return 60, 20
+	case popupUsage:
+		return 60, 18
+	case popupCommandMenu:
+		return 60, 14
+	default:
+		return 50, 10
+	}
+}
+
+func (m *Model) clickModelPicker(bodyY int) (tea.Model, tea.Cmd) {
+	line := 0
+	idx := 0
+	for _, provName := range m.cfg.ConfiguredProviders() {
+		if line == bodyY {
+			return m, nil
+		}
+		line++
+		def := provider.Get(provName)
+		if def == nil {
+			continue
+		}
+		apiKey := m.cfg.GetAPIKey(provName)
+		models := provider.GetModels(m.ctx, provName, apiKey)
+		for _, model := range models {
+			if line == bodyY {
+				m.handlePopupInput(provName + ":" + model.ID)
+				m.popup = popupModel{kind: popupNone}
+				m.input.Focus()
+				return m, nil
+			}
+			line++
+			idx++
+		}
+		line++
+	}
+	return m, nil
+}
+
+func (m *Model) clickThinkingPicker(bodyY int) (tea.Model, tea.Cmd) {
+	idx := bodyY / 3
+	if idx >= 0 && idx < 4 {
+		levels := []string{"low", "medium", "high", "max"}
+		m.handlePopupInput(levels[idx])
+		m.popup = popupModel{kind: popupNone}
+		m.input.Focus()
+	}
+	return m, nil
+}
+
+func (m *Model) clickProviderManager(bodyY int) (tea.Model, tea.Cmd) {
+	if m.popup.addingProvider != "" {
+		return m, nil
+	}
+
+	if bodyY == 0 {
+		m.popup.provSection = 1 - m.popup.provSection
+		m.popup.provSelected = 0
+		return m, nil
+	}
+
+	itemStartY := 2
+	if m.popup.provSection == 0 {
+		n := len(m.cfg.ConfiguredProviders())
+		if bodyY >= itemStartY && bodyY < itemStartY+n {
+			m.popup.provSelected = bodyY - itemStartY
+			return m.removeSelectedProvider()
+		}
+	} else {
+		avail := m.availableProviders()
+		if bodyY >= itemStartY && bodyY < itemStartY+len(avail) {
+			m.popup.provSelected = bodyY - itemStartY
+			return m.addSelectedProvider()
+		}
+	}
+
+	return m, nil
+}
+
+func (m *Model) availableProviders() []string {
+	var avail []string
+	for _, def := range provider.Definitions {
+		if m.cfg.GetAPIKey(def.Name) == "" {
+			avail = append(avail, def.Name)
+		}
+	}
+	return avail
+}
+
+func (m *Model) provSectionItems() int {
+	if m.popup.provSection == 0 {
+		return len(m.cfg.ConfiguredProviders())
+	}
+	return len(m.availableProviders())
+}
+
+func (m *Model) removeSelectedProvider() (tea.Model, tea.Cmd) {
+	configured := m.cfg.ConfiguredProviders()
+	if m.popup.provSelected < 0 || m.popup.provSelected >= len(configured) {
+		return m, nil
+	}
+	provName := configured[m.popup.provSelected]
+	delete(m.cfg.Providers, provName)
+	config.Save(m.cfg)
+	m.addInfoEntry("Provider removed: " + provName)
+	provider.InvalidateCache(provName)
+
+	if m.cfg.Router.Provider == provName {
+		remaining := m.cfg.ConfiguredProviders()
+		if len(remaining) > 0 {
+			m.cfg.Router.Provider = remaining[0]
+			newDef := provider.Get(remaining[0])
+			if newDef != nil && len(newDef.Models) > 0 {
+				m.cfg.Router.Model = newDef.Models[0].ID
+			}
+			if m.router != nil {
+				apiKey := m.cfg.GetAPIKey(remaining[0])
+				baseURL := m.cfg.GetBaseURL(remaining[0])
+				m.router.UpdateConfig(remaining[0], m.cfg.Router.Model, apiKey, baseURL)
+			}
+		} else {
+			m.cfg.Router.Provider = ""
+			m.cfg.Router.Model = ""
+		}
+	}
+
+	n := len(m.cfg.ConfiguredProviders())
+	if n == 0 {
+		m.popup.provSection = 1
+		m.popup.provSelected = 0
+	} else if m.popup.provSelected >= n {
+		m.popup.provSelected = max(0, n-1)
+	}
+
+	return m, nil
+}
+
+func (m *Model) addSelectedProvider() (tea.Model, tea.Cmd) {
+	available := m.availableProviders()
+	if m.popup.provSelected < 0 || m.popup.provSelected >= len(available) {
+		return m, nil
+	}
+	provName := available[m.popup.provSelected]
+	def := provider.Get(provName)
+	if def == nil {
+		return m, nil
+	}
+	if envVal := os.Getenv(def.EnvVar); envVal != "" {
+		m.cfg.SetProvider(provName, envVal)
+		config.Save(m.cfg)
+		m.addInfoEntry("Provider added: " + provName + " (from env)")
+		provider.InvalidateCache(provName)
+		if m.cfg.Router.Provider == "" {
+			m.cfg.Router.Provider = provName
+			if len(def.Models) > 0 {
+				m.cfg.Router.Model = def.Models[0].ID
+			}
+		}
+		if m.popup.provSelected >= len(m.availableProviders()) {
+			m.popup.provSelected = max(0, len(m.availableProviders())-1)
+		}
+	} else {
+		m.popup.addingProvider = provName
+		m.popup.input = ""
+	}
+	return m, nil
 }

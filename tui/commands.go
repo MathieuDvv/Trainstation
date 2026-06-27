@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -62,6 +63,9 @@ func (m *Model) handleSlashCommand(input string) (handled bool, err error) {
 
 	case "provider":
 		m.popup = popupModel{kind: popupProviderManager}
+		if len(m.cfg.ConfiguredProviders()) == 0 {
+			m.popup.provSection = 1
+		}
 		return true, nil
 
 	case "thinking":
@@ -160,7 +164,6 @@ func (m *Model) renderCommandMenu(width int) string {
 
 func (m *Model) renderModelPicker() string {
 	var sb strings.Builder
-	sb.WriteString(boldStyle.Foreground(t.accent).Render("Select Router Model") + "\n\n")
 
 	configured := m.cfg.ConfiguredProviders()
 	if len(configured) == 0 {
@@ -222,42 +225,110 @@ func (m *Model) renderModelPicker() string {
 
 func (m *Model) renderProviderManager() string {
 	var sb strings.Builder
-	sb.WriteString(boldStyle.Foreground(t.accent).Render("Manage Providers") + "\n\n")
 
-	sb.WriteString(boldStyle.Foreground(t.textMuted).Render("Configured:") + "\n")
-	configured := m.cfg.ConfiguredProviders()
-	if len(configured) == 0 {
-		sb.WriteString("  " + dimStyle.Render("none") + "\n")
-	}
-	for _, name := range configured {
-		def := provider.Get(name)
-		label := name
+	if m.popup.addingProvider != "" {
+		def := provider.Get(m.popup.addingProvider)
+		label := m.popup.addingProvider
 		if def != nil {
 			label = def.Label
 		}
-		key := m.cfg.GetAPIKey(name)
-		masked := ""
-		if len(key) > 8 {
-			masked = key[:4] + "..." + key[len(key)-4:]
-		} else if len(key) > 0 {
-			masked = "***"
-		}
-		sb.WriteString(fmt.Sprintf("  %s  %s\n", boldStyle.Render(label), dimStyle.Render(masked)))
-	}
-
-	sb.WriteString("\n" + boldStyle.Foreground(t.textMuted).Render("Available to add:") + "\n")
-	for _, def := range provider.Definitions {
-		if m.cfg.GetAPIKey(def.Name) != "" {
-			continue
+		sb.WriteString(boldStyle.Foreground(t.accent).Render("Add " + label) + "\n\n")
+		sb.WriteString(mutedStyle.Render("Enter API key:") + "\n\n")
+		if m.popup.input != "" {
+			masked := strings.Repeat("*", len(m.popup.input))
+			sb.WriteString("  " + textStyle.Render(masked) + "\n")
+		} else {
+			sb.WriteString("  " + dimStyle.Render("(type or press Enter for env var)") + "\n")
 		}
 		envHint := ""
-		if val := getEnv(def.EnvVar); val != "" {
-			envHint = successStyle.Render(" (env)")
+		if def != nil {
+			if ev := os.Getenv(def.EnvVar); ev != "" {
+				envHint = dimStyle.Render("(" + def.EnvVar + " found in env)")
+			}
 		}
-		sb.WriteString(fmt.Sprintf("  %-14s %s%s\n", def.Name, def.Label, envHint))
+		if envHint != "" {
+			sb.WriteString("\n  " + envHint)
+		}
+		sb.WriteString("\n\n" + dimStyle.Render("Enter to confirm · Esc to cancel"))
+		return sb.String()
 	}
 
-	sb.WriteString("\n" + dimStyle.Render("Type: add <provider> <api_key> or remove <provider>"))
+	configured := m.cfg.ConfiguredProviders()
+	availSection := mutedStyle
+	cfgSection := mutedStyle
+	if m.popup.provSection == 0 {
+		cfgSection = lipgloss.NewStyle().Foreground(t.accent).Bold(true)
+	} else {
+		availSection = lipgloss.NewStyle().Foreground(t.accent).Bold(true)
+	}
+
+	sb.WriteString(cfgSection.Render("▸ Configured") + "  " + availSection.Render("▸ Available") + "\n\n")
+
+	if m.popup.provSection == 0 {
+		if len(configured) == 0 {
+			sb.WriteString("  " + dimStyle.Render("none") + "\n")
+		}
+		for i, name := range configured {
+			selected := m.popup.provSelected == i
+			marker := "  "
+			var bg lipgloss.Color
+			if selected {
+				marker = lipgloss.NewStyle().Foreground(t.error).Render("✕ ")
+				bg = t.bgHover
+			}
+			def := provider.Get(name)
+			label := name
+			if def != nil {
+				label = def.Label
+			}
+			key := m.cfg.GetAPIKey(name)
+			masked := ""
+			if len(key) > 8 {
+				masked = key[:4] + "..." + key[len(key)-4:]
+			} else if len(key) > 0 {
+				masked = "***"
+			}
+			line := fmt.Sprintf("%s%s  %s", marker, boldStyle.Render(label), dimStyle.Render(masked))
+			if selected {
+				line = lipgloss.NewStyle().Background(bg).Render(line)
+			}
+			sb.WriteString(line + "\n")
+		}
+		sb.WriteString("\n" + dimStyle.Render("Enter to remove selected"))
+	} else {
+		available := m.availableProviders()
+		if len(available) == 0 {
+			sb.WriteString("  " + dimStyle.Render("all providers configured") + "\n")
+		}
+		for i, name := range available {
+			selected := m.popup.provSelected == i
+			marker := "  "
+			var bg lipgloss.Color
+			if selected {
+				marker = lipgloss.NewStyle().Foreground(t.success).Render("+ ")
+				bg = t.bgHover
+			}
+			def := provider.Get(name)
+			label := name
+			if def != nil {
+				label = def.Label
+			}
+			envHint := ""
+			if def != nil {
+				if ev := os.Getenv(def.EnvVar); ev != "" {
+					envHint = successStyle.Render(" (env)")
+				}
+			}
+			line := fmt.Sprintf("%s%s%s", marker, label, envHint)
+			if selected {
+				line = lipgloss.NewStyle().Background(bg).Render(line)
+			}
+			sb.WriteString(line + "\n")
+		}
+		sb.WriteString("\n" + dimStyle.Render("Enter to add selected"))
+	}
+
+	sb.WriteString("\n\n" + dimStyle.Render("Tab switch · ↑↓ select · Esc close"))
 	return sb.String()
 }
 
