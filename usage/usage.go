@@ -24,6 +24,7 @@ import (
 var httpClient = &http.Client{
 	Timeout: 15 * time.Second,
 	Transport: &http.Transport{
+		DisableKeepAlives:     true,
 		ForceAttemptHTTP2:     false,
 		MaxIdleConns:          5,
 		IdleConnTimeout:       30 * time.Second,
