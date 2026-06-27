@@ -557,7 +557,7 @@ func (m Model) renderSlashMenu(background string, mainWidth int) string {
 		}
 
 		if i == m.popup.selected {
-			sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bgPanel).Bold(true).Render(line))
+			sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("0")).Bold(true).Render(line))
 		} else {
 			sb.WriteString(lipgloss.NewStyle().Background(t.bgElement).Foreground(t.textMuted).Render(line))
 		}
@@ -629,7 +629,7 @@ func (m Model) renderThinkingPicker() string {
 		}
 		
 		if m.popup.selected == i {
-			sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bgPanel).Bold(true).Render(line) + "\n")
+			sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("0")).Bold(true).Render(line) + "\n")
 		} else {
 			sb.WriteString(line + "\n")
 		}

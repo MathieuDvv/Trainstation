@@ -219,7 +219,7 @@ func (m *Model) renderModelPicker() string {
 			}
 			
 			if m.popup.selected == idx {
-				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bgPanel).Bold(true).Render(line) + "\n")
+				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("0")).Bold(true).Render(line) + "\n")
 			} else {
 				sb.WriteString(line + "\n")
 			}
@@ -283,7 +283,7 @@ func (m *Model) renderProviderManager() string {
 			var bg lipgloss.Color
 			if selected {
 				marker = lipgloss.NewStyle().Foreground(t.error).Render("✕ ")
-				bg = t.bgHover
+				bg = t.borderActive
 			}
 			def := provider.Get(name)
 			label := name
@@ -315,7 +315,7 @@ func (m *Model) renderProviderManager() string {
 			var bg lipgloss.Color
 			if selected {
 				marker = lipgloss.NewStyle().Foreground(t.success).Render("+ ")
-				bg = t.bgHover
+				bg = t.borderActive
 			}
 			def := provider.Get(name)
 			label := name
