@@ -277,7 +277,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		return m, nil
+		
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		cmds = append(cmds, cmd)
+		return m, tea.Batch(cmds...)
 
 	case spinner.TickMsg:
 		if m.state == stateRouting {
@@ -793,6 +797,7 @@ func (m *Model) addUserEntry(text string) {
 	e.text.WriteString(text)
 	m.entries = append(m.entries, e)
 	m.refreshViewport()
+	m.viewport.GotoBottom()
 }
 
 func (m *Model) addRouterEntry(reasoning string, tasks []router.TaskSpec) {
@@ -862,9 +867,12 @@ func (m *Model) addInfoEntry(text string) {
 }
 
 func (m *Model) refreshViewport() {
+	wasAtBottom := m.viewport.AtBottom()
 	content := m.renderEntries()
 	m.viewport.SetContent(content)
-	m.viewport.GotoBottom()
+	if wasAtBottom {
+		m.viewport.GotoBottom()
+	}
 }
 
 func (m Model) renderEntries() string {
