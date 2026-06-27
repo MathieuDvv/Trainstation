@@ -11,7 +11,7 @@ import (
 )
 
 type Config struct {
-	Workspace  string               `yaml:"workspace"`
+	Workspace  string               `yaml:"-"`
 	Router     RouterConfig         `yaml:"router"`
 	Providers  map[string]Provider  `yaml:"providers"`
 	Agents     AgentsConfig         `yaml:"agents"`
@@ -101,6 +101,11 @@ func Load() (*Config, error) {
 	if cfg.Providers == nil {
 		cfg.Providers = make(map[string]Provider)
 	}
+	
+	if cwd, err := os.Getwd(); err == nil {
+		cfg.Workspace = cwd
+	}
+	
 	return &cfg, nil
 }
 

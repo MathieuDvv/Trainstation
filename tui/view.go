@@ -169,8 +169,32 @@ func (m Model) renderStatusLeft() string {
 	case stateRouting:
 		status = warningStyle.Render(m.spinner.View() + " Analyzing task...")
 	case stateExecuting:
-		active := len(m.activeTasks)
-		status = lipgloss.NewStyle().Foreground(t.info).Render(fmt.Sprintf("● Executing %d task(s)", active))
+		if m.currentPlan == nil {
+			active := len(m.activeTasks)
+			status = lipgloss.NewStyle().Foreground(t.info).Render(fmt.Sprintf("● Executing %d task(s)", active))
+		} else {
+			var activeStrs []string
+			for _, task := range m.currentPlan.Tasks {
+				if m.activeTasks[task.ID] {
+					color := agentColor(task.Agent)
+					m.spinner.Style = lipgloss.NewStyle().Foreground(color)
+					loader := m.spinner.View()
+					
+					name := agentLabel(task.Agent)
+					desc := task.Description
+					if len(desc) > 25 {
+						desc = desc[:22] + "..."
+					}
+					
+					activeStrs = append(activeStrs, fmt.Sprintf("%s %s %s", loader, lipgloss.NewStyle().Foreground(color).Bold(true).Render(name), dimStyle.Render(desc)))
+				}
+			}
+			if len(activeStrs) > 0 {
+				status = strings.Join(activeStrs, "   ")
+			} else {
+				status = lipgloss.NewStyle().Foreground(t.info).Render("● Executing...")
+			}
+		}
 	case stateDone:
 		status = successStyle.Render("● Completed — type a new task")
 	default:
@@ -401,8 +425,9 @@ func (m Model) renderTaskList(width int) string {
 		status := "□"
 		statusStyle := dimStyle
 		if _, isActive := m.activeTasks[task.ID]; isActive {
-			status = "▶"
-			statusStyle = lipgloss.NewStyle().Foreground(t.warning)
+			m.spinner.Style = lipgloss.NewStyle().Foreground(t.warning)
+			status = m.spinner.View()
+			statusStyle = lipgloss.NewStyle()
 		} else if m.completedTasks[task.ID] {
 			status = "✓"
 			statusStyle = lipgloss.NewStyle().Foreground(t.success)
