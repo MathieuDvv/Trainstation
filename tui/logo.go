@@ -1,0 +1,34 @@
+package tui
+
+import (
+	"strings"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var logoLines = []string{
+	"████████╗██████╗  █████╗ ██╗███╗   ██╗███████╗████████╗ █████╗ ████████╗██╗ ██████╗ ███╗   ██╗",
+	"╚══██╔══╝██╔══██╗██╔══██╗██║████╗  ██║██╔════╝╚══██╔══╝██╔══██╗╚══██╔══╝██║██╔═══██╗████╗  ██║",
+	"   ██║   ██████╔╝███████║██║██╔██╗ ██║███████╗   ██║   ███████║   ██║   ██║██║   ██║██╔██╗ ██║",
+	"   ██║   ██╔══██╗██╔══██║██║██║╚██╗██║╚════██║   ██║   ██╔══██║   ██║   ██║██║   ██║██║╚██╗██║",
+	"   ██║   ██║  ██║██║  ██║██║██║ ╚████║███████║   ██║   ██║  ██║   ██║   ██║╚██████╔╝██║ ╚████║",
+	"   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝",
+}
+
+func renderLogo(width, height int) string {
+	if height < 15 || width < 100 {
+		// Fallback to minimal header if terminal is too small
+		logoText := lipgloss.NewStyle().Bold(true).Foreground(t.text).Render("⌬ Trainstation")
+		versionText := lipgloss.NewStyle().Foreground(t.textMuted).Render("AI Scheduler")
+		return lipgloss.JoinHorizontal(lipgloss.Top, logoText, " ", versionText) + "\n\n"
+	}
+
+	var renderedLines []string
+	for _, line := range logoLines {
+		renderedLines = append(renderedLines, lipgloss.NewStyle().Bold(true).Foreground(t.primary).Render(line))
+	}
+	
+	logoText := strings.Join(renderedLines, "\n")
+	versionText := lipgloss.NewStyle().Foreground(t.textMuted).Render("AI Scheduler · Type / for commands")
+	
+	return logoText + "\n" + versionText + "\n\n"
+}
