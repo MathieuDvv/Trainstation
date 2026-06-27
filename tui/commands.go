@@ -219,7 +219,7 @@ func (m *Model) renderModelPicker() string {
 			}
 			
 			if m.popup.selected == idx {
-				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Render(line) + "\n")
+				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("#000000")).Bold(true).Render(line) + "\n")
 			} else {
 				sb.WriteString(line + "\n")
 			}
@@ -375,7 +375,6 @@ func (m *Model) renderAgentsPopup() string {
 
 func (m *Model) renderUsagePopup() string {
 	var sb strings.Builder
-	sb.WriteString(boldStyle.Foreground(t.accent).Render("Usage & Balance") + "\n\n")
 
 	sb.WriteString(boldStyle.Foreground(t.textMuted).Render("Router Provider") + "\n")
 	if m.usageSnapshot != nil {
@@ -415,9 +414,10 @@ func (m *Model) renderUsagePopup() string {
 			}
 			bar := lipgloss.NewStyle().Foreground(barColor).Render(strings.Repeat("█", filled)) +
 				lipgloss.NewStyle().Foreground(t.textDim).Render(strings.Repeat("░", barW-filled))
-			status += "  " + bar
 			
-			sb.WriteString(lipgloss.NewStyle().Foreground(color).Render(label) + "  " + mutedStyle.Render(status) + "\n")
+			sb.WriteString(lipgloss.NewStyle().Foreground(color).Bold(true).Render(label) + "\n")
+			sb.WriteString("  " + mutedStyle.Render(status) + "\n")
+			sb.WriteString("  " + bar + "\n\n")
 		}
 	}
 
