@@ -1,0 +1,13 @@
+Panic caught in main:
+test start panic
+
+goroutine 1 [running]:
+runtime/debug.Stack()
+	/opt/homebrew/Cellar/go/1.26.4/libexec/src/runtime/debug/stack.go:26 +0x64
+main.main.func1()
+	/Users/mathieu/Documents/Projects/Others/Trainstation/main.go:19 +0x30
+panic({0x104560280?, 0x1045ca610?})
+	/opt/homebrew/Cellar/go/1.26.4/libexec/src/runtime/panic.go:860 +0x12c
+main.main()
+	/Users/mathieu/Documents/Projects/Others/Trainstation/main.go:30 +0x48
+

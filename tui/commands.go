@@ -209,7 +209,7 @@ func (m *Model) renderModelPicker() string {
 			
 			label := model.Label
 			if m.popup.selected == idx {
-				label = lipgloss.NewStyle().Background(t.bgElement).Foreground(t.text).Render(label)
+				label = lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Padding(0, 1).Render(label)
 			}
 			idx++
 
@@ -393,6 +393,13 @@ func (m *Model) renderUsagePopup() string {
 			color := agentColor(name)
 			label := agentLabel(name)
 			status := u.StatusLine()
+			if u.HasPercent {
+				barW := 15
+				filled := int(u.Percent * float64(barW))
+				bar := lipgloss.NewStyle().Foreground(t.success).Render(strings.Repeat("█", filled)) +
+					lipgloss.NewStyle().Foreground(t.textDim).Render(strings.Repeat("░", barW-filled))
+				status += "  " + bar
+			}
 			sb.WriteString(lipgloss.NewStyle().Foreground(color).Render(label) + "  " + mutedStyle.Render(status) + "\n")
 		}
 	}

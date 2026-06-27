@@ -40,11 +40,13 @@ var httpClient = &http.Client{
 }
 
 type AgentUsage struct {
-	Name     string
-	LoggedIn bool
-	Plan     string
-	Detail   string
-	Error    string
+	Name       string
+	LoggedIn   bool
+	Plan       string
+	Detail     string
+	Error      string
+	HasPercent bool
+	Percent    float64
 }
 
 func (u AgentUsage) StatusLine() string {
@@ -180,7 +182,12 @@ func fetchClaude(ctx context.Context) AgentUsage {
 	out, _ := checkCmd.CombinedOutput()
 	if strings.Contains(string(out), "disabled Claude subscription access") {
 		u.Error = "no usage left"
+		u.HasPercent = true
+		u.Percent = 0.0
 		return u
+	} else if pct, ok := extractUsagePercent(string(out)); ok {
+		u.HasPercent = true
+		u.Percent = pct
 	}
 
 	var status struct {
@@ -224,6 +231,10 @@ func fetchCodex(ctx context.Context) AgentUsage {
 			u.Plan = "ChatGPT"
 		} else if strings.Contains(output, "API key") {
 			u.Plan = "API"
+		}
+		if pct, ok := extractUsagePercent(output); ok {
+			u.HasPercent = true
+			u.Percent = pct
 		}
 		if u.LoggedIn {
 			return u
@@ -297,6 +308,36 @@ func extractJWTClaim(token, claim string) string {
 	val, _ := apiAuth[claim].(string)
 	return val
 }
+
+func extractUsagePercent(text string) (float64, bool) {
+	reRatio := regexp.MustCompile(`(\d+(?:\.\d+)?)\s*(?:/|out of)\s*(\d+(?:\.\d+)?)`)
+	if match := reRatio.FindStringSubmatch(text); match != nil {
+		v1, _ := strconv.ParseFloat(match[1], 64)
+		v2, _ := strconv.ParseFloat(match[2], 64)
+		if v2 > 0 {
+			pct := v1 / v2
+			if strings.Contains(strings.ToLower(text), "used") {
+				pct = 1.0 - pct
+			}
+			if pct < 0 { pct = 0 }
+			if pct > 1 { pct = 1 }
+			return pct, true
+		}
+	}
+	rePct := regexp.MustCompile(`(\d+(?:\.\d+)?)%`)
+	if match := rePct.FindStringSubmatch(text); match != nil {
+		pct, _ := strconv.ParseFloat(match[1], 64)
+		pct = pct / 100.0
+		if strings.Contains(strings.ToLower(text), "used") {
+			pct = 1.0 - pct
+		}
+		if pct < 0 { pct = 0 }
+		if pct > 1 { pct = 1 }
+		return pct, true
+	}
+	return 0, false
+}
+
 
 func base64Decode(s string) ([]byte, error) {
 	return base64.URLEncoding.DecodeString(s)

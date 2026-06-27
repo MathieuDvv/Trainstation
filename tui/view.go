@@ -291,6 +291,13 @@ func (m Model) renderAgentUsageLine(name string, selected bool) string {
 		if m.usageSnapshot != nil {
 			if u, ok := m.usageSnapshot.Agents[name]; ok {
 				usageStr := u.StatusLine()
+				if u.HasPercent {
+					barW := 10
+					filled := int(u.Percent * float64(barW))
+					bar := lipgloss.NewStyle().Foreground(t.success).Background(bg).Render(strings.Repeat("█", filled)) +
+						lipgloss.NewStyle().Foreground(t.textDim).Background(bg).Render(strings.Repeat("░", barW-filled))
+					usageStr += "  " + bar
+				}
 				if u.Error != "" {
 					renderedUsage = lipgloss.NewStyle().Background(bg).Foreground(t.textDim).Render(usageStr)
 				} else {
@@ -318,6 +325,13 @@ func (m Model) renderAgentUsageLine(name string, selected bool) string {
 	if m.usageSnapshot != nil {
 		if u, ok := m.usageSnapshot.Agents[name]; ok {
 			usageStr := u.StatusLine()
+			if u.HasPercent {
+				barW := 10
+				filled := int(u.Percent * float64(barW))
+				bar := lipgloss.NewStyle().Foreground(t.success).Render(strings.Repeat("█", filled)) +
+					lipgloss.NewStyle().Foreground(t.textDim).Render(strings.Repeat("░", barW-filled))
+				usageStr += "  " + bar
+			}
 			if u.Error != "" {
 				renderedUsage = lipgloss.NewStyle().Foreground(t.textDim).Render(usageStr)
 			} else {
@@ -521,7 +535,7 @@ func (m Model) renderSlashMenu(background string, mainWidth int) string {
 		}
 
 		if i == m.popup.selected {
-			sb.WriteString(lipgloss.NewStyle().Background(t.bgHover).Foreground(t.text).Render(line))
+			sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Render(line))
 		} else {
 			sb.WriteString(lipgloss.NewStyle().Background(t.bgElement).Foreground(t.textMuted).Render(line))
 		}
@@ -586,7 +600,7 @@ func (m Model) renderThinkingPicker() string {
 		
 		label := boldStyle.Render(lv.id)
 		if m.popup.selected == i {
-			label = lipgloss.NewStyle().Background(t.bgElement).Foreground(t.text).Render(lv.id)
+			label = lipgloss.NewStyle().Background(t.accent).Foreground(t.bg).Bold(true).Padding(0, 1).Render(lv.id)
 		}
 		
 		sb.WriteString(fmt.Sprintf("%s%s%s\n%s\n\n",
