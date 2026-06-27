@@ -613,24 +613,32 @@ func (m Model) renderThinkingPicker() string {
 		{"max", "Exhaustive — maximum reasoning"},
 	}
 	for i, lv := range levels {
-		marker := "  "
-		current := ""
-		if m.cfg.Router.ThinkingLevel == lv.id {
-			marker = lipgloss.NewStyle().Foreground(t.success).Render("→ ")
-			current = lipgloss.NewStyle().Foreground(t.textDim).Render(" (current)")
-		}
-		
-		label := boldStyle.Render(lv.id)
-		
-		line := fmt.Sprintf("%s%s%s", marker, label, current)
-		pad := 40 - lipgloss.Width(line)
-		if pad > 0 {
-			line += strings.Repeat(" ", pad)
-		}
-		
+		var line string
 		if m.popup.selected == i {
+			markerStr := "  "
+			if m.cfg.Router.ThinkingLevel == lv.id {
+				markerStr = "→ "
+			}
+			currentStr := ""
+			if m.cfg.Router.ThinkingLevel == lv.id {
+				currentStr = " (current)"
+			}
+			
+			line = fmt.Sprintf("%s%s%s", markerStr, lv.id, currentStr)
+			pad := 38 - lipgloss.Width(line)
+			if pad > 0 {
+				line += strings.Repeat(" ", pad)
+			}
 			sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("0")).Bold(true).Render(line) + "\n")
 		} else {
+			marker := "  "
+			current := ""
+			if m.cfg.Router.ThinkingLevel == lv.id {
+				marker = lipgloss.NewStyle().Foreground(t.success).Render("→ ")
+				current = lipgloss.NewStyle().Foreground(t.textDim).Render(" (current)")
+			}
+			label := boldStyle.Render(lv.id)
+			line = fmt.Sprintf("%s%s%s", marker, label, current)
 			sb.WriteString(line + "\n")
 		}
 		sb.WriteString(dimStyle.Render(lv.desc) + "\n\n")

@@ -200,27 +200,38 @@ func (m *Model) renderModelPicker() string {
 		}
 
 		for _, model := range models {
-			marker := "  "
-			current := ""
-			if m.cfg.Router.Provider == provName && m.cfg.Router.Model == model.ID {
-				marker = successStyle.Render("→ ")
-				current = dimStyle.Render(" (current)")
-			}
-			label := model.Label
-			reasoner := ""
-			if model.Reasoner {
-				reasoner = warningStyle.Render(" ◆")
-			}
-			
-			line := fmt.Sprintf("%s%s%s%s", marker, label, reasoner, current)
-			pad := 46 - lipgloss.Width(line)
-			if pad > 0 {
-				line += strings.Repeat(" ", pad)
-			}
-			
+			var line string
 			if m.popup.selected == idx {
+				markerStr := "  "
+				if m.cfg.Router.Provider == provName && m.cfg.Router.Model == model.ID {
+					markerStr = "→ "
+				}
+				currentStr := ""
+				if m.cfg.Router.Provider == provName && m.cfg.Router.Model == model.ID {
+					currentStr = " (current)"
+				}
+				reasonerStr := ""
+				if model.Reasoner {
+					reasonerStr = " ◆"
+				}
+				line = fmt.Sprintf("%s%s%s%s", markerStr, model.Label, reasonerStr, currentStr)
+				pad := 52 - lipgloss.Width(line)
+				if pad > 0 {
+					line += strings.Repeat(" ", pad)
+				}
 				sb.WriteString(lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("0")).Bold(true).Render(line) + "\n")
 			} else {
+				marker := "  "
+				current := ""
+				if m.cfg.Router.Provider == provName && m.cfg.Router.Model == model.ID {
+					marker = successStyle.Render("→ ")
+					current = dimStyle.Render(" (current)")
+				}
+				reasoner := ""
+				if model.Reasoner {
+					reasoner = warningStyle.Render(" ◆")
+				}
+				line = fmt.Sprintf("%s%s%s%s", marker, model.Label, reasoner, current)
 				sb.WriteString(line + "\n")
 			}
 			idx++
@@ -280,10 +291,8 @@ func (m *Model) renderProviderManager() string {
 		for i, name := range configured {
 			selected := m.popup.provSelected == i
 			marker := "  "
-			var bg lipgloss.Color
 			if selected {
-				marker = lipgloss.NewStyle().Foreground(t.error).Render("✕ ")
-				bg = t.borderActive
+				marker = "✕ "
 			}
 			def := provider.Get(name)
 			label := name
@@ -297,9 +306,17 @@ func (m *Model) renderProviderManager() string {
 			} else if len(key) > 0 {
 				masked = "***"
 			}
-			line := fmt.Sprintf("%s%s  %s", marker, boldStyle.Render(label), dimStyle.Render(masked))
+			
+			var line string
 			if selected {
-				line = lipgloss.NewStyle().Background(bg).Render(line)
+				line = fmt.Sprintf("%s%s  %s", marker, label, masked)
+				pad := 56 - lipgloss.Width(line)
+				if pad > 0 {
+					line += strings.Repeat(" ", pad)
+				}
+				line = lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("0")).Bold(true).Render(line)
+			} else {
+				line = fmt.Sprintf("%s%s  %s", marker, boldStyle.Render(label), dimStyle.Render(masked))
 			}
 			sb.WriteString(line + "\n")
 		}
@@ -312,10 +329,8 @@ func (m *Model) renderProviderManager() string {
 		for i, name := range available {
 			selected := m.popup.provSelected == i
 			marker := "  "
-			var bg lipgloss.Color
 			if selected {
-				marker = lipgloss.NewStyle().Foreground(t.success).Render("+ ")
-				bg = t.borderActive
+				marker = "+ "
 			}
 			def := provider.Get(name)
 			label := name
@@ -325,12 +340,23 @@ func (m *Model) renderProviderManager() string {
 			envHint := ""
 			if def != nil {
 				if ev := os.Getenv(def.EnvVar); ev != "" {
-					envHint = successStyle.Render(" (env)")
+					envHint = " (env)"
 				}
 			}
-			line := fmt.Sprintf("%s%s%s", marker, label, envHint)
+			
+			var line string
 			if selected {
-				line = lipgloss.NewStyle().Background(bg).Render(line)
+				line = fmt.Sprintf("%s%s%s", marker, label, envHint)
+				pad := 56 - lipgloss.Width(line)
+				if pad > 0 {
+					line += strings.Repeat(" ", pad)
+				}
+				line = lipgloss.NewStyle().Background(t.accent).Foreground(lipgloss.Color("0")).Bold(true).Render(line)
+			} else {
+				if envHint != "" {
+					envHint = successStyle.Render(envHint)
+				}
+				line = fmt.Sprintf("%s%s%s", marker, label, envHint)
 			}
 			sb.WriteString(line + "\n")
 		}
