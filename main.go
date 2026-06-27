@@ -18,7 +18,15 @@ func main() {
 		if r := recover(); r != nil {
 			errBytes := []byte(fmt.Sprintf("Panic caught in main:\n%v\n\n%s\n", r, string(debug.Stack())))
 			os.WriteFile("crash.log", errBytes, 0644)
-			panic(r)
+			
+			// Force restore terminal state (Alt screen off, Cursor on, Mouse off)
+			fmt.Print("\x1b[?1049l\x1b[?25h\x1b[?1002l\x1b[?1003l\x1b[?1006l")
+			
+			fmt.Printf("\n\033[31;1m💥 Oops! Trainstation crashed unexpectedly.\033[0m\n")
+			fmt.Printf("\033[33mError:\033[0m %v\n\n", r)
+			fmt.Printf("A detailed crash log has been saved to \033[1mcrash.log\033[0m in the current directory.\n")
+			fmt.Printf("Please report this issue if it persists.\n\n")
+			os.Exit(1)
 		}
 	}()
 

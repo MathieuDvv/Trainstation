@@ -121,6 +121,9 @@ func (m *Model) handleSlashCommand(input string) (handled bool, err error) {
 		m.addInfoEntry("Copied all logs to clipboard!")
 		return true, nil
 
+	case "panic":
+		panic("Testing crash handler")
+
 	default:
 		return true, fmt.Errorf("unknown command: /%s — try /help", cmdName)
 	}

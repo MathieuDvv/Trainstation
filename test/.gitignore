@@ -1,4 +1,17 @@
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
 dist/
+build/
+.venv/
+*.egg
+
+# Node
+node_modules/
+
+# Logs
 *.log
+
+# OS
 .DS_Store
