@@ -481,10 +481,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					idx = 0
 				}
 				cmd := m.slashMatches[idx]
-				m.input.SetValue("/" + cmd.name + " ")
-				m.input.SetCursor(len(m.input.Value()))
 				m.slashMode = false
 				m.slashInput = ""
+				m.input.Reset()
+				
+				if cmd.name == "focus" {
+					m.input.SetValue("/focus ")
+					m.input.SetCursor(len(m.input.Value()))
+					return m, nil
+				}
+				
+				_, err := m.handleSlashCommand("/" + cmd.name)
+				if err != nil {
+					m.addErrorEntry(err.Error())
+				}
 				return m, nil
 			}
 
@@ -614,11 +624,8 @@ func (m Model) handlePopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.addSelectedProvider()
 		}
 		if m.popup.kind == popupModelPicker || m.popup.kind == popupThinkingPicker {
-			input := strings.TrimSpace(m.popup.input)
-			if input == "" && len(m.popup.options) > 0 && m.popup.selected >= 0 && m.popup.selected < len(m.popup.options) {
-				input = m.popup.options[m.popup.selected]
-			}
-			if input != "" {
+			if len(m.popup.options) > 0 && m.popup.selected >= 0 && m.popup.selected < len(m.popup.options) {
+				input := m.popup.options[m.popup.selected]
 				m.handlePopupInput(input)
 			}
 			m.popup = popupModel{kind: popupNone}
@@ -639,6 +646,7 @@ func (m Model) handlePopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.popup.kind == popupModelPicker || m.popup.kind == popupThinkingPicker {
 			if len(m.popup.input) > 0 {
 				m.popup.input = m.popup.input[:len(m.popup.input)-1]
+				m.popupJumpToMatch()
 			}
 			return m, nil
 		}
@@ -654,12 +662,26 @@ func (m Model) handlePopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.popup.kind == popupModelPicker || m.popup.kind == popupThinkingPicker {
 		if msg.Type == tea.KeyRunes || msg.Type == tea.KeySpace {
 			m.popup.input += string(msg.Runes)
+			m.popupJumpToMatch()
 			return m, nil
 		}
 		return m, nil
 	}
 
 	return m, nil
+}
+
+func (m *Model) popupJumpToMatch() {
+	query := strings.ToLower(m.popup.input)
+	if query == "" {
+		return
+	}
+	for i, opt := range m.popup.options {
+		if strings.Contains(strings.ToLower(opt), query) {
+			m.popup.selected = i
+			return
+		}
+	}
 }
 
 func (m *Model) handlePopupInput(input string) {
