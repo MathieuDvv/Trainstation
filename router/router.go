@@ -199,3 +199,51 @@ func cleanJSON(s string) string {
 	s = strings.TrimSuffix(s, "```")
 	return strings.TrimSpace(s)
 }
+
+func (r *Router) Summarize(ctx context.Context, originalPrompt string, taskResults []string) (string, error) {
+	var sb strings.Builder
+	sb.WriteString("You are Trainstation, an AI task scheduler. You just routed the following task:\n\n")
+	sb.WriteString("USER PROMPT:\n" + originalPrompt + "\n\n")
+	sb.WriteString("Here are the results of the subtasks you scheduled:\n\n")
+	for i, res := range taskResults {
+		sb.WriteString(fmt.Sprintf("--- TASK %d RESULT ---\n%s\n\n", i+1, res))
+	}
+	sb.WriteString("Please provide a concise, high-level summary of what was accomplished and any notable issues. Format the response beautifully using Markdown.")
+
+	params := openai.ChatCompletionNewParams{
+		Model: shared.ChatModel(r.model),
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage(sb.String()),
+			openai.UserMessage("Summarize the execution."),
+		},
+	}
+
+	if provider.IsReasoner(r.provider, r.model) {
+		switch r.thinking {
+		case "low":
+			params.ReasoningEffort = shared.ReasoningEffortLow
+		case "high":
+			params.ReasoningEffort = shared.ReasoningEffortHigh
+		case "max":
+			params.ReasoningEffort = shared.ReasoningEffortHigh
+		default:
+			params.ReasoningEffort = shared.ReasoningEffortMedium
+		}
+	}
+
+	resp, err := r.client.Chat.Completions.New(ctx, params)
+	if err != nil {
+		return "", fmt.Errorf("summary LLM call failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("summary returned no choices")
+	}
+
+	content := resp.Choices[0].Message.Content
+	if content == "" {
+		return "", fmt.Errorf("summary returned empty content")
+	}
+
+	return content, nil
+}

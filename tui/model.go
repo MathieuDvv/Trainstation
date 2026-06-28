@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/wordwrap"
 
@@ -29,6 +30,7 @@ const (
 	stateIdle appState = iota
 	stateRouting
 	stateExecuting
+	stateSummarizing
 	stateDone
 )
 
@@ -40,6 +42,7 @@ const (
 	entryAgent
 	entryError
 	entryInfo
+	entrySummary
 )
 
 type entry struct {
@@ -291,12 +294,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 
 	case spinner.TickMsg:
-		if m.state == stateRouting {
-			var cmd tea.Cmd
-			m.spinner, cmd = m.spinner.Update(msg)
-			return m, cmd
-		}
-		return m, nil
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 
 	case tea.KeyMsg:
 		if m.popup.kind != popupNone {
@@ -330,7 +330,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.state == stateExecuting && m.eventCh != nil {
 			cmds = append(cmds, m.waitForEvent())
 		}
+		if m.state == stateSummarizing {
+			cmds = append(cmds, m.startSummary())
+		}
 		return m, tea.Batch(cmds...)
+
+	case summaryResultMsg:
+		if msg.err != nil {
+			m.addErrorEntry(fmt.Sprintf("Summary failed: %v", msg.err))
+		} else {
+			m.addSummaryEntry(msg.summary)
+		}
+		m.state = stateDone
+		m.input.Focus()
+		m.refreshViewport()
+		return m, nil
 
 	case errMsg:
 		m.addErrorEntry(msg.err.Error())
@@ -790,12 +804,10 @@ func (m *Model) handleEvent(event scheduler.Event) {
 		m.markAgentEntryDone(event.TaskID, event.Err)
 
 	case scheduler.EventAllDone:
-		m.state = stateDone
+		m.state = stateSummarizing
 		for name := range m.agentStatus {
 			m.agentStatus[name] = "idle"
 		}
-		m.addInfoEntry("All tasks completed.")
-		m.input.Focus()
 	}
 	m.refreshViewport()
 }
@@ -967,6 +979,40 @@ func (m *Model) addInfoEntry(text string) {
 	m.refreshViewport()
 }
 
+func (m *Model) addSummaryEntry(text string) {
+	e := entry{kind: entrySummary, agent: "router", startTime: time.Now()}
+	e.text = text
+	m.entries = append(m.entries, e)
+	m.refreshViewport()
+}
+
+type summaryResultMsg struct {
+	summary string
+	err     error
+}
+
+func (m *Model) startSummary() tea.Cmd {
+	var results []string
+	for _, e := range m.entries {
+		if e.kind == entryAgent {
+			results = append(results, e.text)
+		}
+	}
+	
+	var originalPrompt string
+	for i := len(m.entries) - 1; i >= 0; i-- {
+		if m.entries[i].kind == entryUser {
+			originalPrompt = m.entries[i].text
+			break
+		}
+	}
+
+	return func() tea.Msg {
+		summary, err := m.router.Summarize(context.Background(), originalPrompt, results)
+		return summaryResultMsg{summary: summary, err: err}
+	}
+}
+
 func (m *Model) refreshViewport() {
 	wasAtBottom := m.viewport.AtBottom()
 	content := m.renderEntries()
@@ -1032,6 +1078,30 @@ func (m Model) renderEntries() string {
 				bodyStr += bar + mutedStyle.Render(line)
 			}
 			sb.WriteString(bar + label + "\n" + bodyStr)
+
+		case entrySummary:
+			color := agentColor("router")
+			bar := leftBar(color)
+			label := boldStyle.Foreground(color).Render("Summary")
+			
+			r, err := glamour.NewTermRenderer(
+				glamour.WithAutoStyle(),
+				glamour.WithWordWrap(wrapWidth-4),
+			)
+			var bodyStr string
+			if err == nil {
+				rendered, err := r.Render(e.text)
+				if err == nil {
+					for _, line := range strings.Split(strings.TrimSpace(rendered), "\n") {
+						bodyStr += bar + line + "\n"
+					}
+				} else {
+					bodyStr = bar + err.Error() + "\n"
+				}
+			} else {
+				bodyStr = bar + err.Error() + "\n"
+			}
+			sb.WriteString(bar + label + "\n" + strings.TrimRight(bodyStr, "\n"))
 
 		case entryAgent:
 			color := agentColor(e.agent)

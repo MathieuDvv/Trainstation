@@ -195,6 +195,8 @@ func (m Model) renderStatusLeft() string {
 				status = lipgloss.NewStyle().Foreground(t.info).Render("● Executing...")
 			}
 		}
+	case stateSummarizing:
+		status = warningStyle.Render(m.spinner.View() + " Summarizing execution...")
 	case stateDone:
 		status = successStyle.Render("● Completed — type a new task")
 	default:
